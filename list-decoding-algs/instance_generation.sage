@@ -114,6 +114,82 @@ def gen_simulated_instance(
     return all_broadcasts
 
 
+def sample_from_vec(freqs):
+    """
+    Given a discrete probability distribution `freqs`, sample an item accordingly. 1-indexed to
+    match use in Zipfian distributions.
+
+    Args:
+        freqs (list[float]): The probability of sampling each value
+
+    Returns:
+        int: A value sampled according to the passed frequencies
+    """
+
+    rand_num = random.random()
+    cumulative_sum = 0.0
+    for i, freq in enumerate(freqs):
+        cumulative_sum += freq
+        if rand_num < cumulative_sum:
+            return i + 1
+
+
+def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n):
+    """
+    Generates an instance based on a Zipfian distribution of client inputs
+
+    Args:
+        field (FiniteField): The field to draw values from
+        pR (PolynomialRing): The polynomial ring clients sample polynomials from
+        ell (int): The degree of the polynomials
+        c (int): The number of polynomials a client submits points on in each report
+        agreement (int): The minimum number of points submitted for the same value at which that
+            value should be considered "present" in the input (and therefore need to be
+            reconstructed).
+        support (int): The support of the Zipfian distribution. The number of possible client
+            values.
+        s (float): The s parameter for the Zipfian distribution
+        n (int): The total number of points in the instance
+
+    Returns:
+        tuple[
+            dict[int, list[Polynomial]],
+            list[
+                tuple[Integer, list[Integer], Integer]
+            ]
+        ]: A generated instance. First tuple element is the present Zipf ranks and their associated
+        polynomials. Second is the instance itself. A list of points, each of which also has the
+        value associated with it as the final entry.
+    """
+
+    normalization_const = sum(1 / (k ** s) for k in range(1, support + 1))
+
+    freqs = [(1 / (k ** s)) / normalization_const for k in range(1, support + 1)]
+    eval_points = gen_unique_elements(field, n)
+
+    rank_to_polys = {}
+    codeword = []
+    rank_counts = Counter()
+    for eval_point in eval_points:
+        rank = sample_from_vec(freqs)
+        rank_counts.update([rank])
+
+        if rank not in rank_to_polys:
+            polys = [random_polynomial(pR, ell) for _ in range(c)]
+            rank_to_polys[rank] = polys
+
+        codeword.append(
+            [eval_point, list(poly(eval_point) for poly in rank_to_polys[rank]), rank]
+        )
+
+    present_ranks = {}
+    for rank, polys in rank_to_polys.items():
+        if rank_counts[rank] >= agreement:
+            present_ranks[rank] = polys
+
+    return present_ranks, codeword
+
+
 if __name__ == "__main__":
     field = GF((2 ** 20).previous_prime())
     pR = PolynomialRing(field, "z")
