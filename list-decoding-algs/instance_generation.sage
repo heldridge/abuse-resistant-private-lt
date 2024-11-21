@@ -2,6 +2,7 @@ import random
 
 from sage.all import GF, PolynomialRing, shuffle
 
+
 def random_non_zero_element(field):
     elt = field.random_element()
     while elt == 0:
@@ -124,15 +125,15 @@ if __name__ == "__main__":
         codeword = gen_simulated_instance(
             field=field,
             pR=pR,
-            ell=1, # doesn't matter for simulation
-            c=1, # doesn't matter for simulation
+            ell=1,  # doesn't matter for simulation
+            c=1,  # doesn't matter for simulation
             num_stalkers=num_stalkers,
             anonymity_epoch=4,
             delta=4,
             detection_time=3600,
             deletion_percent=5,
             num_noise_points=0,
-            previous_windows=23
+            previous_windows=23,
         )
 
         seen_xs = set()
@@ -143,7 +144,8 @@ if __name__ == "__main__":
             seen_xs.add(symbol[0])
 
         for stalker in range(num_stalkers):
-            point_counts.append(len(list(filter(lambda pt: pt[2] == stalker, new_codeword))))
-    
-    print(sum(point_counts)/len(point_counts))
-        
+            point_counts.append(
+                len(list(filter(lambda pt: pt[2] == stalker, new_codeword)))
+            )
+
+    print(sum(point_counts) / len(point_counts))
