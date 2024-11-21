@@ -1,4 +1,5 @@
 import random
+from collections import Counter
 
 from sage.all import GF, PolynomialRing, shuffle
 
