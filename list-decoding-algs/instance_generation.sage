@@ -2,6 +2,7 @@ import random
 from collections import Counter
 
 from sage.all import GF, PolynomialRing, shuffle
+from tqdm import tqdm
 
 
 def random_non_zero_element(field):
@@ -135,6 +136,12 @@ def sample_from_vec(freqs):
             return i + 1
 
 
+def get_shuffled_sequential_elements(field, start, end):
+    elements = [field(e) for e in range(start, end)]
+    shuffle(elements)
+    return elements
+
+
 def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n):
     """
     Generates an instance based on a Zipfian distribution of client inputs
@@ -162,16 +169,17 @@ def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n):
         polynomials. Second is the instance itself. A list of points, each of which also has the
         value associated with it as the final entry.
     """
-
     normalization_const = sum(1 / (k ** s) for k in range(1, support + 1))
 
     freqs = [(1 / (k ** s)) / normalization_const for k in range(1, support + 1)]
-    eval_points = gen_unique_elements(field, n)
+    eval_points = get_shuffled_sequential_elements(field, 1, n + 1)
 
     rank_to_polys = {}
     codeword = []
     rank_counts = Counter()
-    for eval_point in eval_points:
+    for eval_point in tqdm(
+        eval_points, desc="Generating instance", leave=False, position=1
+    ):
         rank = sample_from_vec(freqs)
         rank_counts.update([rank])
 
