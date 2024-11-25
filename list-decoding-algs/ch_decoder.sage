@@ -1,4 +1,5 @@
 #!/usr/bin/env sage
+import sys
 import argparse
 import json
 import math
@@ -26,9 +27,11 @@ def my_monomials_of_degree(polyring, degree):
 
 
 class DecodeResult:
-    def __init__(self, time_to_detect, solns):
+    def __init__(self, time_to_detect, solns, hit_bad_case = False):
         self.time_to_detect = time_to_detect
         self.solns = solns
+        self.hit_bad_case = hit_bad_case
+
 
 # --------------------------------------------------
 # HELPER FUNCTIONS 
@@ -222,7 +225,7 @@ class CHDecoder:
                 x_indics[i] = 0
         return x_indics
 
-    def first_step(self, message, locs):
+    def first_step(self, message, locs, use_weak_popov_only = False):
         lagr_polys = []
         if locs.count(1) == len(message):
             lagr_polys = self.a_list
@@ -238,7 +241,11 @@ class CHDecoder:
         for i in range(self._c):
             M_D[0, i + 1] = lagr_polys[i]
             M_D[i + 1, i + 1] = N
-        A = M_D.popov_form()
+
+        if use_weak_popov_only:
+            A = M_D.weak_popov_form()
+        else:
+            A = M_D.popov_form()
         return A
 
     def construct_one_out(self, basis_vectors, amplify, err_poly):
@@ -266,7 +273,7 @@ class CHDecoder:
                 add_all_short_vecs = add_vectors(add_all_short_vecs, itr_vec)
         return list(add_all_short_vecs)
 
-    def list_decode(self, message):
+    def list_decode(self, message, use_weak_popov_only = False):
         #global x_coords_list, valid_polys
 
         done_first_detection = False
@@ -280,6 +287,8 @@ class CHDecoder:
         self.N, self.Ls, self.w = lagrange_basis(self._z, self.x_coords, self._pR)
         x_indics = [1] * len(message)
         self.a_list = self.create_interpols(message, x_indics)
+
+        hit_bad_case = False
         solns = []
         clfs = True  # continue-looking-for-solutions
         while clfs:
@@ -310,6 +319,13 @@ class CHDecoder:
                 clfs = False
                 continue
             else:
+                hit_bad_case = True
+
+                if use_weak_popov_only:
+                    # We don't care about the hard case when only using weak_popov
+                    clfs = False
+                    continue
+
                 # checking for hard multi-solution cases
                 # first part does work of deciding which points to use to craft the second lattice
                 excl_fact = self.N
@@ -394,7 +410,7 @@ class CHDecoder:
         if not done_first_detection:
             done_first_detection = True
             time_to_detect = time.time() - detection_start
-        return DecodeResult(time_to_detect, solns)
+        return DecodeResult(time_to_detect, solns, hit_bad_case)
 
 
 if __name__ == "__main__":
