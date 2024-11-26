@@ -325,6 +325,7 @@ class CHDecoder:
                     # We don't care about the hard case when only using weak_popov
                     clfs = False
                     continue
+                print("IN BAD CASE. THIS SHOULD NOT HAPPEN")
 
                 # checking for hard multi-solution cases
                 # first part does work of deciding which points to use to craft the second lattice

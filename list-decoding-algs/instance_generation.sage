@@ -142,7 +142,7 @@ def get_shuffled_sequential_elements(field, start, end):
     return elements
 
 
-def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n):
+def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n, tqdm_position=2):
     """
     Generates an instance based on a Zipfian distribution of client inputs
 
@@ -178,7 +178,7 @@ def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n):
     codeword = []
     rank_counts = Counter()
     for eval_point in tqdm(
-        eval_points, desc="Generating instance", leave=False, position=1
+        eval_points, desc="Generating instance", leave=False, position=tqdm_position
     ):
         rank = sample_from_vec(freqs)
         rank_counts.update([rank])
