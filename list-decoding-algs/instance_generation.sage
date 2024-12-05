@@ -1,8 +1,65 @@
+import json
 import random
 from collections import Counter
 
-from sage.all import GF, PolynomialRing, shuffle
+from sage.all import GF, Integer, PolynomialRing, shuffle
 from tqdm import tqdm
+
+
+def serialize_poly(poly, degree):
+    return [int(poly[i]) for i in range(degree + 1)]
+
+
+def serialize_instance(field, pR, n, c, ell, agreement, valid_polys, codeword):
+    data = {
+        "parameters": {
+            "field_size": len(field),
+            "variable": str(pR.gens()[0]),
+            "n": int(n),
+            "c": int(c),
+            "ell": int(ell),
+            "agreement": int(agreement),
+        },
+        "present_ranks": {
+            int(rank): list(map(lambda poly: serialize_poly(poly, ell), poly_list))
+            for rank, poly_list in valid_polys.items()
+        },
+        "codeword": list(
+            map(
+                lambda symbol: [
+                    int(symbol[0]),
+                    list(map(int, symbol[1])),
+                    int(symbol[2]),
+                ],
+                codeword,
+            )
+        ),
+    }
+    return data
+
+
+def load_poly(pR, poly):
+    return pR(list(reversed(poly)))
+
+
+def load_instance(filename):
+    with open(filename) as infile:
+        data = json.load(infile)
+
+    field = GF(data["parameters"]["field_size"])
+    pR = PolynomialRing(field, data["parameters"]["variable"])
+
+    present_ranks = {
+        rank: list(map(lambda poly: load_poly(pR, poly), poly_list))
+        for rank, poly_list in data["present_ranks"].items()
+    }
+
+    codeword = [
+        [field(symbol[0]), [field(yc) for yc in symbol[1]], Integer(symbol[2])]
+        for symbol in data["codeword"]
+    ]
+
+    return field, pR, present_ranks, codeword
 
 
 def random_non_zero_element(field):
@@ -169,9 +226,9 @@ def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n, tqdm_posit
         polynomials. Second is the instance itself. A list of points, each of which also has the
         value associated with it as the final entry.
     """
-    normalization_const = sum(1 / (k ** s) for k in range(1, support + 1))
+    normalization_const = sum(1 / (k**s) for k in range(1, support + 1))
 
-    freqs = [(1 / (k ** s)) / normalization_const for k in range(1, support + 1)]
+    freqs = [(1 / (k**s)) / normalization_const for k in range(1, support + 1)]
     eval_points = get_shuffled_sequential_elements(field, 1, n + 1)
 
     rank_to_polys = {}
@@ -200,7 +257,7 @@ def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n, tqdm_posit
 
 
 if __name__ == "__main__":
-    field = GF((2 ** 20).previous_prime())
+    field = GF((2**20).previous_prime())
     pR = PolynomialRing(field, "z")
     iterations = 100
     num_stalkers = 1
