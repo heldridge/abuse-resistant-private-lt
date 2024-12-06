@@ -13,6 +13,14 @@ def mdss_threshold(n, c, ell):
     return ceil((n + (c * ell)) / (c + 1))
 
 
+def serialize_poly(poly, degree):
+    return [int(poly[i]) for i in range(degree + 1)]
+
+
+def load_poly(pR, poly):
+    return pR(list(reversed(poly)))
+
+
 @dataclass
 class Instance:
     field: Any
@@ -50,61 +58,58 @@ class Instance:
         threshold = mdss_threshold(self.n, self.c, self.ell)
         self.is_nice = Instance.calc_if_nice(threshold, self.symbol_to_dealer)
 
+    def to_serializable(self):
+        return {
+            "parameters": {
+                "field_size": len(self.field),
+                "variable": str(self.pR.gens()[0]),
+                "n": int(self.n),
+                "c": int(self.c),
+                "ell": int(self.ell),
+                "agreement": int(self.agreement),
+                "is_nice": self.is_nice,
+            },
+            "present_dealers": {
+                int(rank): list(
+                    map(lambda poly: serialize_poly(poly, self.ell), poly_list)
+                )
+                for rank, poly_list in self.present_dealers.items()
+            },
+            "codeword": list(
+                map(
+                    lambda symbol: [
+                        int(symbol[0]),
+                        list(map(int, symbol[1])),
+                    ],
+                    self.codeword,
+                )
+            ),
+            "symbol_to_dealer": list(map(int, self.symbol_to_dealer)),
+        }
 
-def serialize_poly(poly, degree):
-    return [int(poly[i]) for i in range(degree + 1)]
+    @staticmethod
+    def from_json(data):
+        params = data["parameters"]
+        f = GF(params["field_size"])
+        pR = PolynomialRing(f, params["variable"])
 
-
-def serialize_instance(field, pR, n, c, ell, agreement, valid_polys, codeword):
-    data = {
-        "parameters": {
-            "field_size": len(field),
-            "variable": str(pR.gens()[0]),
-            "n": int(n),
-            "c": int(c),
-            "ell": int(ell),
-            "agreement": int(agreement),
-        },
-        "present_ranks": {
-            int(rank): list(map(lambda poly: serialize_poly(poly, ell), poly_list))
-            for rank, poly_list in valid_polys.items()
-        },
-        "codeword": list(
-            map(
-                lambda symbol: [
-                    int(symbol[0]),
-                    list(map(int, symbol[1])),
-                    int(symbol[2]),
-                ],
-                codeword,
-            )
-        ),
-    }
-    return data
-
-
-def load_poly(pR, poly):
-    return pR(list(reversed(poly)))
-
-
-def load_instance(filename):
-    with open(filename) as infile:
-        data = json.load(infile)
-
-    field = GF(data["parameters"]["field_size"])
-    pR = PolynomialRing(field, data["parameters"]["variable"])
-
-    present_ranks = {
-        rank: list(map(lambda poly: load_poly(pR, poly), poly_list))
-        for rank, poly_list in data["present_ranks"].items()
-    }
-
-    codeword = [
-        [field(symbol[0]), [field(yc) for yc in symbol[1]], Integer(symbol[2])]
-        for symbol in data["codeword"]
-    ]
-
-    return field, pR, present_ranks, codeword
+        return Instance(
+            f,
+            pR,
+            params["n"],
+            params["c"],
+            params["ell"],
+            params["agreement"],
+            {
+                dealer_id: list(map(lambda poly: load_poly(pR, poly), poly_list))
+                for dealer_id, poly_list in data["present_dealers"].items()
+            },
+            [
+                [f(symbol[0]), [f(yc) for yc in symbol[1]]]
+                for symbol in data["codeword"]
+            ],
+            data["symbol_to_dealer"],
+        )
 
 
 def random_non_zero_element(field):
@@ -244,7 +249,7 @@ def get_shuffled_sequential_elements(field, start, end):
     return elements
 
 
-def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n, tqdm_position=2):
+def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n, **tqdm_args):
     """
     Generates an instance based on a Zipfian distribution of client inputs
 
@@ -278,27 +283,29 @@ def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n, tqdm_posit
 
     rank_to_polys = {}
     codeword = []
-    rank_counts = Counter()
-    for eval_point in tqdm(
-        eval_points, desc="Generating instance", leave=False, position=tqdm_position
-    ):
+    symbol_to_dealer = []
+    for eval_point in tqdm(eval_points, **tqdm_args):
         rank = sample_from_vec(freqs)
-        rank_counts.update([rank])
 
         if rank not in rank_to_polys:
             polys = [random_polynomial(pR, ell) for _ in range(c)]
             rank_to_polys[rank] = polys
 
         codeword.append(
-            [eval_point, list(poly(eval_point) for poly in rank_to_polys[rank]), rank]
+            [eval_point, list(poly(eval_point) for poly in rank_to_polys[rank])]
         )
+        symbol_to_dealer.append(rank)
 
     present_ranks = {}
+    rank_counts = Counter(symbol_to_dealer)
+
     for rank, polys in rank_to_polys.items():
         if rank_counts[rank] >= agreement:
             present_ranks[rank] = polys
 
-    return present_ranks, codeword
+    return Instance(
+        field, pR, n, c, ell, agreement, present_ranks, codeword, symbol_to_dealer
+    )
 
 
 if __name__ == "__main__":
@@ -357,13 +364,9 @@ if __name__ == "__main__":
     field = GF(Integer(args.min_field).next_prime())
     pR = PolynomialRing(field, args.variable)
 
-    present_ranks, codeword = gen_zipfian_instance(
-        field, pR, args.ell, args.c, args.agreement, args.support, args.s, args.N, 0
-    )
-
-    serialized = serialize_instance(
-        field, pR, args.N, args.c, args.ell, args.agreement, present_ranks, codeword
+    inst = gen_zipfian_instance(
+        field, pR, args.ell, args.c, args.agreement, args.support, args.s, args.N
     )
 
     with open(args.filename, "w+") as outfile:
-        json.dump(serialized, outfile)
+        json.dump(inst.to_serializable(), outfile)

@@ -1,6 +1,9 @@
+import json
 import unittest
 
-from instance_generation import Instance
+from sage.all import GF, Integer, PolynomialRing
+
+from instance_generation import Instance, gen_zipfian_instance
 
 
 class TestInstanceCalcIfNice(unittest.TestCase):
@@ -42,6 +45,28 @@ class TestInstanceCalcIfNice(unittest.TestCase):
                 ],
             )
         )
+
+
+class TestInstanceSerialization(unittest.TestCase):
+    def test_serialization(self):
+        f = GF(13)
+        pR = PolynomialRing(f, "x")
+
+        inst = gen_zipfian_instance(f, pR, 2, 2, 3, 10, 1.5, 10, disable=True)
+        json.dumps(inst.to_serializable())
+
+    def test_pipeline(self):
+        f = GF(13)
+        pR = PolynomialRing(f, "x")
+
+        inst = gen_zipfian_instance(f, pR, 2, 2, 3, 10, 1.5, 10, disable=True)
+
+        data = inst.to_serializable()
+
+        new_inst = Instance.from_json(data)
+
+        self.assertEqual(inst.agreement, new_inst.agreement)
+        self.assertEqual(inst.codeword, new_inst.codeword)
 
 
 if __name__ == "__main__":
