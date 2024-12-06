@@ -323,38 +323,3 @@ if __name__ == "__main__":
 
     with open(args.filename, "w+") as outfile:
         json.dump(serialized, outfile)
-
-    # field = GF((2**20).previous_prime())
-    # pR = PolynomialRing(field, "z")
-    # iterations = 100
-    # num_stalkers = 1
-    #
-    # point_counts = []
-    # for _ in range(iterations):
-    #     codeword = gen_simulated_instance(
-    #         field=field,
-    #         pR=pR,
-    #         ell=1,  # doesn't matter for simulation
-    #         c=1,  # doesn't matter for simulation
-    #         num_stalkers=num_stalkers,
-    #         anonymity_epoch=4,
-    #         delta=4,
-    #         detection_time=3600,
-    #         deletion_percent=5,
-    #         num_noise_points=0,
-    #         previous_windows=23,
-    #     )
-    #
-    #     seen_xs = set()
-    #     new_codeword = []
-    #     for symbol in codeword:
-    #         if symbol[0] not in seen_xs:
-    #             new_codeword.append(symbol)
-    #         seen_xs.add(symbol[0])
-    #
-    #     for stalker in range(num_stalkers):
-    #         point_counts.append(
-    #             len(list(filter(lambda pt: pt[2] == stalker, new_codeword)))
-    #         )
-    #
-    # print(sum(point_counts) / len(point_counts))
