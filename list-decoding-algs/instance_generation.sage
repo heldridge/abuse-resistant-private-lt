@@ -1,10 +1,54 @@
+import argparse
 import json
 import random
 from collections import Counter
-import argparse
+from dataclasses import dataclass, field
+from typing import Any
 
-from sage.all import GF, Integer, PolynomialRing, shuffle
+from sage.all import GF, Integer, PolynomialRing, ceil, shuffle
 from tqdm import tqdm
+
+
+def mdss_threshold(n, c, ell):
+    return ceil((n + (c * ell)) / (c + 1))
+
+
+@dataclass
+class Instance:
+    field: Any
+    pR: Any
+    n: int
+    c: int
+    ell: int
+    agreement: int
+    present_dealers: dict[int, list[list[Any]]]
+    codeword: list[tuple[Integer, list[Integer]]]
+    symbol_to_dealer: list[int]
+    is_nice: bool = field(init=False)
+
+    @staticmethod
+    def calc_if_nice(threshold, symbol_to_dealer):
+
+        if len(symbol_to_dealer) == 0:
+            return True
+
+        c = Counter(symbol_to_dealer)
+
+        prev_count = c.most_common(1)[0][1] + 2
+
+        for _, count in c.most_common():
+            if count < threshold:
+                break
+            if prev_count - count <= 1 or count == threshold:
+                return False
+
+            prev_count = count
+
+        return True
+
+    def __post_init__(self):
+        threshold = mdss_threshold(self.n, self.c, self.ell)
+        self.is_nice = Instance.calc_if_nice(threshold, self.symbol_to_dealer)
 
 
 def serialize_poly(poly, degree):
