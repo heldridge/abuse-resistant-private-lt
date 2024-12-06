@@ -1,6 +1,7 @@
 import json
 import random
 from collections import Counter
+import argparse
 
 from sage.all import GF, Integer, PolynomialRing, shuffle
 from tqdm import tqdm
@@ -257,37 +258,103 @@ def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n, tqdm_posit
 
 
 if __name__ == "__main__":
-    field = GF((2**20).previous_prime())
-    pR = PolynomialRing(field, "z")
-    iterations = 100
-    num_stalkers = 1
+    parser = argparse.ArgumentParser("Generate a Zipfian MDSS instance")
+    parser.add_argument("filename", help="The file to write the instance to")
+    parser.add_argument(
+        "-N",
+        help="The number of points in the instance. Default 10,000.",
+        type=int,
+        default=10_000,
+    )
+    parser.add_argument(
+        "-c", help="The MDSS c parameter. Default 20.", type=int, default=20
+    )
+    parser.add_argument(
+        "-t",
+        "--agreement",
+        help="The number of matching points required for a value to be considered present. Default 143.",
+        type=int,
+        default=143,
+    )
+    parser.add_argument(
+        "-l",
+        "-ell",
+        "--ell",
+        help="The MDSS ell parameter. Default 20.",
+        type=int,
+        default=20,
+    )
+    parser.add_argument(
+        "-u",
+        "--support",
+        help="The support of the Zipfian instance. Default 10,000.",
+        type=int,
+        default=10_000,
+    )
+    parser.add_argument(
+        "-s", help="The Zipf s parameter. Default 1.03.", type=float, default=1.03
+    )
+    parser.add_argument(
+        "--min-field",
+        "-mf",
+        help="The minimum field size. Default 100,000",
+        type=int,
+        default=100_000,
+    )
+    parser.add_argument(
+        "-v",
+        "--variable",
+        help="The polynomial variable. Default x.",
+        type=str,
+        default="x",
+    )
+    args = parser.parse_args()
 
-    point_counts = []
-    for _ in range(iterations):
-        codeword = gen_simulated_instance(
-            field=field,
-            pR=pR,
-            ell=1,  # doesn't matter for simulation
-            c=1,  # doesn't matter for simulation
-            num_stalkers=num_stalkers,
-            anonymity_epoch=4,
-            delta=4,
-            detection_time=3600,
-            deletion_percent=5,
-            num_noise_points=0,
-            previous_windows=23,
-        )
+    field = GF(Integer(args.min_field).next_prime())
+    pR = PolynomialRing(field, args.variable)
 
-        seen_xs = set()
-        new_codeword = []
-        for symbol in codeword:
-            if symbol[0] not in seen_xs:
-                new_codeword.append(symbol)
-            seen_xs.add(symbol[0])
+    present_ranks, codeword = gen_zipfian_instance(
+        field, pR, args.ell, args.c, args.agreement, args.support, args.s, args.N, 0
+    )
 
-        for stalker in range(num_stalkers):
-            point_counts.append(
-                len(list(filter(lambda pt: pt[2] == stalker, new_codeword)))
-            )
+    serialized = serialize_instance(
+        field, pR, args.N, args.c, args.ell, args.agreement, present_ranks, codeword
+    )
 
-    print(sum(point_counts) / len(point_counts))
+    with open(args.filename, "w+") as outfile:
+        json.dump(serialized, outfile)
+
+    # field = GF((2**20).previous_prime())
+    # pR = PolynomialRing(field, "z")
+    # iterations = 100
+    # num_stalkers = 1
+    #
+    # point_counts = []
+    # for _ in range(iterations):
+    #     codeword = gen_simulated_instance(
+    #         field=field,
+    #         pR=pR,
+    #         ell=1,  # doesn't matter for simulation
+    #         c=1,  # doesn't matter for simulation
+    #         num_stalkers=num_stalkers,
+    #         anonymity_epoch=4,
+    #         delta=4,
+    #         detection_time=3600,
+    #         deletion_percent=5,
+    #         num_noise_points=0,
+    #         previous_windows=23,
+    #     )
+    #
+    #     seen_xs = set()
+    #     new_codeword = []
+    #     for symbol in codeword:
+    #         if symbol[0] not in seen_xs:
+    #             new_codeword.append(symbol)
+    #         seen_xs.add(symbol[0])
+    #
+    #     for stalker in range(num_stalkers):
+    #         point_counts.append(
+    #             len(list(filter(lambda pt: pt[2] == stalker, new_codeword)))
+    #         )
+    #
+    # print(sum(point_counts) / len(point_counts))
