@@ -2,3 +2,4 @@ ch_decoder.py
 expected_deletions.py
 instance_generation.py
 *.sage.py
+*.json
