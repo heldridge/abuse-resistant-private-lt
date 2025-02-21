@@ -308,6 +308,43 @@ def gen_zipfian_instance(field, pR, ell, c, agreement, support, s, n, **tqdm_arg
     )
 
 
+def gen_malicious_client_instance(field, pR, ell, c, agreement, evals, **tqdm_args):
+    """
+    Generates an instance where there is a maliciously crafted input point.
+    Malicious input is of the form (x, y_1, y_2,..., r,..., y_c), where y_i is an honestly
+    generated point, and r is a randomly sampled value.
+    """
+    n = sum(evals)
+    rank_to_polys = [
+        [random_polynomial(pR, ell) for _ in range(c)] for _ in range(len(evals))
+    ]
+
+    eval_points = gen_unique_elements(field, n)
+
+    i = 0
+    codeword = []
+    symbol_to_dealer = []
+    for dealer, count in enumerate(evals):
+        eval_point = eval_points[i]
+
+        for _ in range(count):
+            codeword.append(
+                [eval_point, list(poly(eval_point) for poly in rank_to_polys[dealer])]
+            )
+            symbol_to_dealer.append(dealer)
+        i += 1
+
+    present_ranks = {}
+    rank_counts = Counter(symbol_to_dealer)
+    for dealer, polys in enumerate(rank_to_polys):
+        if rank_counts[dealer] >= agreement:
+            present_ranks[dealer] = polys
+
+    return Instance(
+        field, pR, n, c, ell, agreement, present_ranks, codeword, symbol_to_dealer
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Generate a Zipfian MDSS instance")
     parser.add_argument("filename", help="The file to write the instance to")
@@ -359,14 +396,32 @@ if __name__ == "__main__":
         type=str,
         default="x",
     )
+    parser.add_argument(
+        "-m",
+        "--malicious",
+        help="Generate a malicious rather than Zipfian instance",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-e",
+        "--evals",
+        nargs="*",
+        help="The number of points each malicious client should contribute",
+        type=int,
+    )  # TODO: Replace with a subcommand rather than two flags
     args = parser.parse_args()
 
     field = GF(Integer(args.min_field).next_prime())
     pR = PolynomialRing(field, args.variable)
 
-    inst = gen_zipfian_instance(
-        field, pR, args.ell, args.c, args.agreement, args.support, args.s, args.N
-    )
+    if args.malicious:
+        inst = gen_malicious_client_instance(
+            field, pR, args.ell, args.c, args.agreement, args.evals
+        )
+    else:
+        inst = gen_zipfian_instance(
+            field, pR, args.ell, args.c, args.agreement, args.support, args.s, args.N
+        )
 
     with open(args.filename, "w+") as outfile:
         json.dump(inst.to_serializable(), outfile)
