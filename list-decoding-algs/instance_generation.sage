@@ -324,13 +324,19 @@ def gen_malicious_client_instance(field, pR, ell, c, agreement, evals, **tqdm_ar
     i = 0
     codeword = []
     symbol_to_dealer = []
+    done_bad_point = False
     for dealer, count in enumerate(evals):
         eval_point = eval_points[i]
 
         for _ in range(count):
-            codeword.append(
-                [eval_point, list(poly(eval_point) for poly in rank_to_polys[dealer])]
-            )
+            point = [
+                eval_point,
+                list(poly(eval_point) for poly in rank_to_polys[dealer]),
+            ]
+            if not done_bad_point:
+                point[1][0] = field.random_element()
+
+            codeword.append(point)
             symbol_to_dealer.append(dealer)
         i += 1
 
